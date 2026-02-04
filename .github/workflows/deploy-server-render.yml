@@ -1,0 +1,28 @@
+name: Deploy Server to Render
+
+on:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  deploy:
+    name: Deploy to Render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install (server)
+        working-directory: server
+        run: npm ci
+
+      - name: Deploy to Render
+        uses: render-examples/deploy-service-action@v1
+        with:
+          api_key: ${{ secrets.RENDER_API_KEY }}
+          service_id: ${{ secrets.RENDER_SERVICE_ID }}
+          directory: server
