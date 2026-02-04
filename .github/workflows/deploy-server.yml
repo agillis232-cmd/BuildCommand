@@ -29,3 +29,23 @@ jobs:
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Fetch Vercel deployment URL
+        id: get-url
+        run: |
+          curl -s -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" "https://api.vercel.com/v6/deployments?projectId=${{ secrets.VERCEL_PROJECT_ID }}" > vercel_deploys.json
+          node -e "const d=require('./vercel_deploys.json'); if(!d.deployments||!d.deployments[0]){console.error('no deployments'); process.exit(1);} console.log(d.deployments[0].url)" > deploy_url.txt
+          echo "deploy_url=$(cat deploy_url.txt)" >> $GITHUB_OUTPUT
+
+      - name: Update app.json with production URL
+        env:
+          DEPLOY_URL: ${{ steps.get-url.outputs.deploy_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Deploy URL: $DEPLOY_URL"
+          node scripts/update-appjson.js "$DEPLOY_URL"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app.json
+          git commit -m "ci: update SERVER_URL to $DEPLOY_URL [skip ci]" || echo "no changes to commit"
+          git push origin HEAD:master
