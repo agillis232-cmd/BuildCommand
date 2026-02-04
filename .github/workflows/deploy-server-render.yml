@@ -26,3 +26,23 @@ jobs:
           api_key: ${{ secrets.RENDER_API_KEY }}
           service_id: ${{ secrets.RENDER_SERVICE_ID }}
           directory: server
+
+      - name: Fetch Render service info
+        id: get-render-url
+        run: |
+          curl -s -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}" > render_service.json
+          node -e "const d=require('./render_service.json'); const svc=d.service||d; const url=svc.defaultDomain||svc.serviceDetails?.defaultDomain||svc.serviceDetails?.url||svc.serviceDetails?.defaultUrl||svc.serviceDetails?.default_domain||svc.default_url||svc.url; if(!url){console.error(JSON.stringify(d)); process.exit(1);} console.log(url)" > render_url.txt
+          echo "render_url=$(cat render_url.txt)" >> $GITHUB_OUTPUT
+
+      - name: Update app.json with Render URL
+        env:
+          DEPLOY_URL: ${{ steps.get-render-url.outputs.render_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Render URL: $DEPLOY_URL"
+          node scripts/update-appjson.js "$DEPLOY_URL"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app.json
+          git commit -m "ci: update SERVER_URL to $DEPLOY_URL [skip ci]" || echo "no changes to commit"
+          git push origin HEAD:master
